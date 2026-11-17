@@ -1,0 +1,18 @@
+flowchart TB
+    subgraph Client[User device — phone, tablet or desktop]
+      UI[React user interface]
+      ROUTER[React Router and protected pages]
+      AXIOS[Axios HTTP client]
+      UI --> ROUTER --> AXIOS
+    end
+    subgraph Server[Node.js and Express backend]
+      CORS[CORS and request parsing]
+      SESSION[Session middleware]
+      ROUTES[Auth, reports, claims and admin routers]
+      AUTH[Route-level authentication and role middleware]
+      RULES[Input validation and business rules]
+      CORS --> SESSION --> ROUTES --> AUTH --> RULES
+    end
+    DB[(MySQL database)]
+    AXIOS <-->|HTTP / JSON + HTTP-only session cookie| CORS
+    RULES <-->|Parameterized SQL| DB

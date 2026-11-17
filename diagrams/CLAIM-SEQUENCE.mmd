@@ -1,0 +1,17 @@
+sequenceDiagram
+    actor Student
+    participant React as React Claim Page
+    participant API as Express API
+    participant Auth as Auth Middleware
+    participant DB as MySQL
+    Student->>React: Enter ownership evidence
+    React->>API: POST /api/claims with itemReportId and evidence
+    API->>Auth: Check authenticated session
+    Auth-->>API: Student identity
+    API->>DB: SELECT found report by id
+    DB-->>API: Report owner/type/status
+    API->>API: Validate not own report, FOUND, OPEN, not duplicate
+    API->>DB: INSERT claim as PENDING
+    DB-->>API: New claim id
+    API-->>React: 201 Created + message
+    React-->>Student: Show success and claim status

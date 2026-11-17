@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> PENDING: Student submits claim
+    PENDING --> APPROVED: Admin approves with reason
+    PENDING --> REJECTED: Admin rejects with reason
+    APPROVED --> [*]: Collection confirmed separately
+    REJECTED --> [*]
+    note right of APPROVED
+      Approval is permission to collect.
+      It does not mean the item is returned.
+    end note

@@ -1,0 +1,16 @@
+flowchart TD
+    A[Student reports an item as LOST or FOUND] --> B[Report saved with OPEN status]
+    B --> C[Users browse and search public listing]
+    C --> D{Is this a FOUND report?}
+    D -- No --> C
+    D -- Yes --> E[Student submits private ownership evidence]
+    E --> F[Backend checks owner, item status and duplicate/approved claims]
+    F --> G[Claim saved as PENDING]
+    G --> H[Administrator reviews private evidence]
+    H --> I{Decision}
+    I -- Reject --> J[Save REJECTED and reason]
+    I -- Approve --> K[Save APPROVED and collection instructions]
+    K --> L[Claimant physically collects item]
+    L --> M[Administrator confirms collection]
+    M --> N[Report status becomes RETURNED]
+    N --> O[Public listing displays RETURNED; new claims blocked]

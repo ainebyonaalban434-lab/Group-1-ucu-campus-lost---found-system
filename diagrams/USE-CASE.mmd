@@ -1,0 +1,28 @@
+flowchart LR
+    Student([Student])
+    Admin([Administrator])
+    subgraph System[UCU Campus Lost and Found System]
+      UC1((Register / Login / Logout))
+      UC2((Create lost report))
+      UC3((Create found report))
+      UC4((Edit own reports))
+      UC5((Search and filter reports))
+      UC6((Submit private claim))
+      UC7((View own reports and claims))
+      UC8((Review claims))
+      UC9((Approve or reject with reason))
+      UC10((Confirm collection and return))
+      UC11((Manage reports))
+    end
+    Student --> UC1
+    Student --> UC2
+    Student --> UC3
+    Student --> UC4
+    Student --> UC5
+    Student --> UC6
+    Student --> UC7
+    Admin --> UC1
+    Admin --> UC8
+    Admin --> UC9
+    Admin --> UC10
+    Admin --> UC11

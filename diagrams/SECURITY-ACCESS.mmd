@@ -1,0 +1,15 @@
+flowchart TD
+    REQ[Incoming request] --> SESSION{Valid authenticated session?}
+    SESSION -- No --> DENY401[401 Unauthorized]
+    SESSION -- Yes --> ROLE{Administrator-only action?}
+    ROLE -- Yes --> ADMIN{Role is ADMIN?}
+    ADMIN -- No --> DENY403[403 Forbidden]
+    ADMIN -- Yes --> ACTION[Continue to admin handler]
+    ROLE -- No --> OWNER{Private record access?}
+    OWNER -- Yes --> CHECK{Is claimant or report owner?}
+    CHECK -- No --> DENY403
+    CHECK -- Yes --> ACTION2[Return only authorized private fields]
+    OWNER -- No --> PUBLIC[Return explicit public fields only]
+    ACTION --> DB[(MySQL)]
+    ACTION2 --> DB
+    PUBLIC --> DB

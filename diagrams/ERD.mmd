@@ -1,0 +1,40 @@
+erDiagram
+    USERS ||--o{ ITEM_REPORTS : "reports"
+    USERS ||--o{ CLAIMS : "submits"
+    USERS o|--o{ CLAIMS : "reviews as admin"
+    ITEM_REPORTS ||--o{ CLAIMS : "receives"
+
+    USERS {
+        INT id PK
+        VARCHAR full_name
+        VARCHAR email UK
+        VARCHAR password_hash
+        ENUM role
+        TIMESTAMP created_at
+    }
+    ITEM_REPORTS {
+        INT id PK
+        INT reporter_id FK
+        ENUM item_type
+        VARCHAR title
+        VARCHAR category
+        TEXT public_description
+        TEXT private_details
+        DATE item_date
+        VARCHAR campus_location
+        VARCHAR image_url
+        ENUM status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    CLAIMS {
+        INT id PK
+        INT item_report_id FK
+        INT claimant_id FK
+        TEXT evidence
+        ENUM status
+        TEXT admin_response
+        INT reviewed_by FK
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
