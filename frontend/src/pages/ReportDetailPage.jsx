@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../api';
@@ -7,16 +8,21 @@ export default function ReportDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const loadReport = async () => {
       try {
         const { data } = await api.get(`/reports/${id}`);
         setReport(data.report);
-      } catch (error) {
-        console.error(error);
+      } catch (loadError) {
+        setError(
+          loadError.response?.data?.message ||
+          'Unable to load this report. Please try again.'
+        );
       } finally {
         setLoading(false);
       }
@@ -29,12 +35,32 @@ export default function ReportDetailPage() {
     return <p>Loading report...</p>;
   }
 
+  if (error) {
+    return (
+      <div className="page-shell">
+        <div className="error-banner">{error}</div>
+        <Link className="secondary-button inline-button" to="/">
+          Back to reports
+        </Link>
+      </div>
+    );
+  }
+
   if (!report) {
     return <div className="empty-state">Report not found.</div>;
   }
 
-  const isOwner = user && report.reporter_id === user.id;
-  const canClaim = user && user.role === 'STUDENT' && !isOwner && report.item_type === 'FOUND';
+  const isOwner = user && Number(report.reporter_id) === Number(user.id);
+
+  const canEdit =
+    isOwner && report.status !== 'RETURNED';
+
+  const canClaim =
+    user &&
+    user.role === 'STUDENT' &&
+    !isOwner &&
+    report.item_type === 'FOUND' &&
+    report.status === 'OPEN';
 
   return (
     <div className="page-shell">
@@ -47,7 +73,9 @@ export default function ReportDetailPage() {
 
       <article className="detail-card">
         <div className="report-card-top">
-          <span className={`status-badge ${report.item_type.toLowerCase()}`}>{report.item_type}</span>
+          <span className={`status-badge ${report.item_type.toLowerCase()}`}>
+            {report.item_type}
+          </span>
           <span>{report.status}</span>
         </div>
 
@@ -64,11 +92,29 @@ export default function ReportDetailPage() {
           </div>
         )}
 
-        {report.image_url && <img className="report-image" src={report.image_url} alt={report.title} />}
+        {report.image_url && (
+          <img
+            className="report-image"
+            src={report.image_url}
+            alt={report.title}
+          />
+        )}
 
-        {isOwner && <Link className="primary-button inline-button" to={`/reports/${report.id}/edit`}>Edit report</Link>}
+        {canEdit && (
+          <Link
+            className="primary-button inline-button"
+            to={`/reports/${report.id}/edit`}
+          >
+            Edit report
+          </Link>
+        )}
+
         {canClaim && (
-          <button type="button" className="primary-button inline-button" onClick={() => navigate(`/claims/${report.id}`)}>
+          <button
+            type="button"
+            className="primary-button inline-button"
+            onClick={() => navigate(`/claims/${report.id}`)}
+          >
             Submit ownership claim
           </button>
         )}

@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -5,6 +6,8 @@ import MySQLStoreFactory from 'express-mysql-session';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 
 import pool from './config/db.js';
 import authRoutes from './routes/auth.js';
@@ -39,17 +42,85 @@ if (missingVariables.length > 0) {
   );
 }
 
+const FRONTEND_ORIGIN = new URL(
+  process.env.FRONTEND_URL || 'http://localhost:5173'
+).origin;
+
 // Trust the hosting proxy only in production.
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
+// Apply security middleware.
+app.use(helmet());
+
+// General rate limit: 100 requests per IP every 15 minutes.
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+  })
+);
+
+// Stricter limits for sensitive authentication endpoints.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: 'Too many authentication attempts. Try again later.',
+  },
+});
+
+const adminSetupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: 'Too many administrator setup attempts. Try again later.',
+  },
+});
+
+// Configure CORS.
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: FRONTEND_ORIGIN,
     credentials: true,
   })
 );
+
+// Protect cookie-authenticated browser requests against cross-origin actions.
+// Requests without Origin/Referer remain available to API clients such as Postman.
+app.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+
+  const requestOrigin = req.get('origin');
+  const referer = req.get('referer');
+
+  try {
+    const suppliedOrigin = requestOrigin
+      ? new URL(requestOrigin).origin
+      : referer
+        ? new URL(referer).origin
+        : null;
+
+    if (suppliedOrigin && suppliedOrigin !== FRONTEND_ORIGIN) {
+      return res.status(403).json({
+        message: 'Request origin is not allowed.',
+      });
+    }
+  } catch {
+    return res.status(403).json({
+      message: 'Invalid request origin.',
+    });
+  }
+
+  return next();
+});
 
 app.use(express.json({ limit: '4mb' }));
 app.use(cookieParser());
@@ -77,6 +148,7 @@ const sessionStore = new MySQLStore(
   pool
 );
 
+// Configure persistent sessions.
 app.use(
   session({
     name: 'ucu.sid',
@@ -93,11 +165,12 @@ app.use(
   })
 );
 
+// Database health check.
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
 
-    res.status(200).json({
+    return res.status(200).json({
       status: 'ok',
       message: 'UCU Lost and Found API is running.',
       database: 'connected',
@@ -105,7 +178,7 @@ app.get('/api/health', async (req, res) => {
   } catch (error) {
     console.error('Health check database query failed:', error.message);
 
-    res.status(503).json({
+    return res.status(503).json({
       status: 'error',
       message: 'The service is temporarily unavailable.',
       database: 'disconnected',
@@ -113,6 +186,12 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Apply specific rate limits before mounting authentication routes.
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/register', loginLimiter);
+app.use('/api/auth/setup-admin', adminSetupLimiter);
+
+// Register application routes.
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/claims', claimRoutes);
@@ -120,10 +199,22 @@ app.use('/api/admin', adminRoutes);
 
 // Central error handler.
 app.use((err, req, res, next) => {
-  console.error(err);
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'An unexpected server error occurred.';
-  res.status(statusCode).json({ message });
+  console.error('Request error:', err);
+
+  const requestedStatus = Number(err.statusCode);
+  const statusCode =
+    Number.isInteger(requestedStatus) &&
+    requestedStatus >= 400 &&
+    requestedStatus < 500
+      ? requestedStatus
+      : 500;
+
+  const message =
+    statusCode === 500
+      ? 'An unexpected server error occurred.'
+      : err.message || 'The request could not be completed.';
+
+  return res.status(statusCode).json({ message });
 });
 
 // Start only after the persistent session store is ready.

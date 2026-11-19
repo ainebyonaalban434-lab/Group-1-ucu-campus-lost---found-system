@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api';
@@ -8,19 +9,31 @@ export default function ClaimSubmissionPage() {
   const [evidence, setEvidence] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (isSubmitting) return;
+
+    setError('');
+    setIsSubmitting(true);
+
     try {
       const { data } = await api.post('/claims', {
         itemReportId: Number(id),
-        evidence,
+        evidence: evidence.trim(),
       });
 
       setSuccess(data.message);
       setTimeout(() => navigate('/my-claims'), 900);
     } catch (submitError) {
-      setError(submitError.response?.data?.message || 'Unable to submit your claim.');
+      setError(
+        submitError.response?.data?.message ||
+        'Unable to submit your claim.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -39,10 +52,24 @@ export default function ClaimSubmissionPage() {
 
         <label>
           Private ownership description
-          <textarea value={evidence} onChange={(event) => setEvidence(event.target.value)} rows={6} required />
+          <textarea
+            value={evidence}
+            onChange={(event) => {
+              setEvidence(event.target.value);
+              setError('');
+            }}
+            rows={6}
+            required
+          />
         </label>
 
-        <button type="submit" className="primary-button full-width">Submit claim</button>
+        <button
+          type="submit"
+          className="primary-button full-width"
+          disabled={isSubmitting || Boolean(success)}
+        >
+          {isSubmitting ? 'Submitting claim...' : 'Submit claim'}
+        </button>
       </form>
     </div>
   );
