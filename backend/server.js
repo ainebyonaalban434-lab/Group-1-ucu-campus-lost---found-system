@@ -93,11 +93,24 @@ app.use(
   })
 );
 
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'UCU Lost and Found API is running.',
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+
+    res.status(200).json({
+      status: 'ok',
+      message: 'UCU Lost and Found API is running.',
+      database: 'connected',
+    });
+  } catch (error) {
+    console.error('Health check database query failed:', error.message);
+
+    res.status(503).json({
+      status: 'error',
+      message: 'The service is temporarily unavailable.',
+      database: 'disconnected',
+    });
+  }
 });
 
 app.use('/api/auth', authRoutes);

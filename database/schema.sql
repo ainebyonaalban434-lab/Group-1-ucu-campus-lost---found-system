@@ -50,3 +50,11 @@ CREATE TABLE IF NOT EXISTS claims (
   CONSTRAINT fk_claims_claimant FOREIGN KEY (claimant_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_claims_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Persistent session storage used by express-mysql-session.
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  expires INT UNSIGNED NOT NULL,
+  data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+  PRIMARY KEY (session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

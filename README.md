@@ -20,7 +20,7 @@ A responsive UCU lost-and-found web application built with the examination-requi
 
 ## Prerequisites
 
-Install Node.js (a supported current LTS release), npm, Git and MySQL Server. Ensure the MySQL command-line client is available in PowerShell. Use VS Code and Postman (or equivalent HTTP client) for development and testing.
+Install Node.js (a supported current LTS release), npm, Git and MySQL Server. Ensure the MySQL command-line client is available in PowerShell. Use VS Code and Postman (or an equivalent HTTP client) for development and testing.
 
 ## Install dependencies
 
@@ -49,13 +49,17 @@ The current server calls `dotenv.config()` using the backend process working dir
 
 ## Create the database
 
+Run these commands from the project root:
+
 ```powershell
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS ucu_lost_found_db;"
-Get-Content .\database\schema.sql | mysql -u root -p ucu_lost_found_db
-Get-Content .\database\seed.sql | mysql -u root -p ucu_lost_found_db
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p -e "CREATE DATABASE IF NOT EXISTS ucu_lost_found_db;"
+Get-Content .\database\schema.sql | & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p ucu_lost_found_db
+Get-Content .\database\seed.sql | & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p ucu_lost_found_db
 ```
 
-The SQL scripts create the tables and fictional sample records. Do not use real student data in the sample database.
+The schema creates the application tables, including the persistent `sessions` table used by `express-mysql-session`.
+
+The seed script inserts fictional users, item reports and a sample claim. It is optional and should only be run once on a fresh database after applying the schema. Do not run it repeatedly because it uses fixed record IDs and sample email addresses. Do not use real student data in the sample database.
 
 ## Start development servers
 
@@ -65,16 +69,18 @@ From the project root:
 npm run dev
 ```
 
-Or run them separately in two terminals:
+Alternatively, run the applications separately in two terminals.
+
+**Terminal 1 — Backend**
 
 ```powershell
-# Terminal 1
 Set-Location .\backend
 npm run dev
 ```
 
+**Terminal 2 — Frontend**
+
 ```powershell
-# Terminal 2
 Set-Location .\frontend
 npm run dev
 ```
@@ -83,22 +89,33 @@ The current backend defaults to `http://localhost:5000`; the current frontend de
 
 ## Health check
 
+With the backend running, execute:
+
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:5000/api/health"
 ```
 
-Note: the current health endpoint confirms the Express process is running. Before deployment, enhance it to test database readiness too.
+The health endpoint checks both the Express API and MySQL database connectivity.
+
+- **HTTP 200:** `status: ok` and `database: connected` indicate that the API and database are available.
+- **HTTP 503:** `status: error` and `database: disconnected` indicate that the database health check failed.
 
 ## Production frontend build
+
+Run the following commands:
 
 ```powershell
 Set-Location .\frontend
 npm run build
 ```
 
+The production build output is generated in the frontend build directory configured by Vite.
+
 ## Initial administrator
 
-The backend currently provides `POST /api/auth/setup-admin`, protected by `ADMIN_SETUP_KEY`. Use only a configured private key and fictional assessment data. Before deployment, harden this route so it cannot be used repeatedly or when the setup key is missing. Never put the key in Git, slides, screenshots or public documentation. Assessment credentials must be submitted privately through Moodle as instructed by the lecturer.
+The backend currently provides `POST /api/auth/setup-admin`, protected by `ADMIN_SETUP_KEY`. Use only a configured private key and fictional assessment data.
+
+Before deployment, verify that this route cannot be used repeatedly and that setup is rejected when the setup key is missing. Never put the key in Git, slides, screenshots or public documentation. Assessment credentials must be submitted privately through Moodle as instructed by the lecturer.
 
 ## Testing
 
@@ -106,6 +123,13 @@ Use `documentation/test-matrix.md`. Record the test date, tester, steps, expecte
 
 ## Milestones and examination submission
 
-See `documentation/PROJECT_REVIEW.md`, `documentation/manual-implementation-guide.md`, `documentation/milestone-1-design-brief.md` and `documentation/presentation-guide.md`.
+See:
 
-The examination paper states a fourteen-day project duration. A shorter group sprint is an internal target only. Final Moodle submission requires the report, repository link, final commit ID, deployed URL, database scripts, fictional sample data, test evidence, slides, milestone evidence, acknowledgements and private assessment credentials.
+- `documentation/PROJECT_REVIEW.md`
+- `documentation/manual-implementation-guide.md`
+- `documentation/milestone-1-design-brief.md`
+- `documentation/presentation-guide.md`
+
+The examination paper states a fourteen-day project duration. A shorter group sprint is an internal target only.
+
+Final Moodle submission requires the report, repository link, final commit ID, deployed URL, database scripts, fictional sample data, test evidence, slides, milestone evidence, acknowledgements and private assessment credentials.
