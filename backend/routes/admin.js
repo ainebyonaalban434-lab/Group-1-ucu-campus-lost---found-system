@@ -41,6 +41,7 @@ router.get('/claims', async (req, res, next) => {
   }
 });
 
+
 router.patch('/claims/:id', async (req, res, next) => {
   let connection;
   let transactionActive = false;
@@ -64,57 +65,84 @@ router.patch('/claims/:id', async (req, res, next) => {
     await connection.beginTransaction();
     transactionActive = true;
 
-    const [rows] = await connection.execute(
-      'SELECT * FROM claims WHERE id = ? FOR UPDATE',
+    const rejectRequest = async (statusCode, message) => {
+      await connection.rollback();
+      transactionActive = false;
+      return res.status(statusCode).json({ message });
+    };
+
+    // Read the report ID without locking the claim.
+    const [initialRows] = await connection.execute(
+      'SELECT item_report_id FROM claims WHERE id = ?',
       [claimId]
     );
 
-    if (!rows.length) {
-      await connection.rollback();
-      transactionActive = false;
-      return res.status(404).json({ message: 'Claim not found.' });
+    if (!initialRows.length) {
+      return await rejectRequest(404, 'Claim not found.');
     }
 
-    const claim = rows[0];
+    const reportId = initialRows[0].item_report_id;
 
+    // Lock the report first, matching claim submission and return workflows.
     const [reportRows] = await connection.execute(
       'SELECT * FROM item_reports WHERE id = ? FOR UPDATE',
-      [claim.item_report_id]
+      [reportId]
     );
 
     if (!reportRows.length) {
-      await connection.rollback();
-      transactionActive = false;
-      return res.status(404).json({ message: 'Related report not found.' });
+      return await rejectRequest(404, 'Related report not found.');
     }
 
+    // Lock the claim second.
+    const [claimRows] = await connection.execute(
+      'SELECT * FROM claims WHERE id = ? AND item_report_id = ? FOR UPDATE',
+      [claimId, reportId]
+    );
+
+    if (!claimRows.length) {
+      return await rejectRequest(404, 'Claim not found.');
+    }
+
+    const claim = claimRows[0];
     const report = reportRows[0];
 
-    if (status === 'APPROVED') {
-      if (report.status === 'RETURNED') {
-        await connection.rollback();
-        transactionActive = false;
-        return res.status(409).json({
-          message: 'A claim cannot be approved after the item has been returned.',
-        });
-      }
+    if (claim.status !== 'PENDING') {
+      return await rejectRequest(
+        409,
+        'This claim has already been reviewed and cannot be changed.'
+      );
+    }
 
+    if (report.status === 'RETURNED') {
+      return await rejectRequest(
+        409,
+        'Claims cannot be reviewed after the item has been returned.'
+      );
+    }
+
+    if (status === 'APPROVED') {
       const [existingApproved] = await connection.execute(
-        'SELECT id FROM claims WHERE item_report_id = ? AND status = ? AND id != ? LIMIT 1',
-        [claim.item_report_id, 'APPROVED', claimId]
+        `SELECT id
+         FROM claims
+         WHERE item_report_id = ?
+           AND status = 'APPROVED'
+           AND id != ?
+         LIMIT 1`,
+        [reportId, claimId]
       );
 
       if (existingApproved.length) {
-        await connection.rollback();
-        transactionActive = false;
-        return res.status(409).json({
-          message: 'Only one claim may be approved for a particular item.',
-        });
+        return await rejectRequest(
+          409,
+          'Only one claim may be approved for a particular item.'
+        );
       }
     }
 
     await connection.execute(
-      'UPDATE claims SET status = ?, admin_response = ?, reviewed_by = ?, updated_at = NOW() WHERE id = ?',
+      `UPDATE claims
+       SET status = ?, admin_response = ?, reviewed_by = ?, updated_at = NOW()
+       WHERE id = ?`,
       [status, adminResponse || null, req.session.userId, claimId]
     );
 
@@ -135,6 +163,7 @@ router.patch('/claims/:id', async (req, res, next) => {
     }
   }
 });
+
 
 router.patch('/reports/:id/return', async (req, res, next) => {
   let connection;

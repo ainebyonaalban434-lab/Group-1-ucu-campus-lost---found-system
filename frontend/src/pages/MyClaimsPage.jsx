@@ -51,10 +51,9 @@ export default function MyClaimsPage() {
                 <span className={`status-badge ${claim.status.toLowerCase()}`}>{claim.status}</span>
                 <span>{claim.item_title}</span>
               </div>
-              <p>{claim.evidence}</p>
               {claim.admin_response && <p><strong>Admin response:</strong> {claim.admin_response}</p>}
               <button className="secondary-button inline-button" type="button" onClick={() => viewEvidence(claim.id)}>
-                View evidence
+                View private evidence
               </button>
             </article>
           ))}

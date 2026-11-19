@@ -44,9 +44,17 @@ CREATE TABLE IF NOT EXISTS claims (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_claims_item_claimant (item_report_id, claimant_id),
+  UNIQUE KEY uq_claims_item_claimant (item_report_id, claimant_id),
   KEY idx_claims_status (status),
   CONSTRAINT fk_claims_item FOREIGN KEY (item_report_id) REFERENCES item_reports(id) ON DELETE CASCADE,
   CONSTRAINT fk_claims_claimant FOREIGN KEY (claimant_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_claims_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Persistent session storage used by express-mysql-session.
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  expires INT UNSIGNED NOT NULL,
+  data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+  PRIMARY KEY (session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

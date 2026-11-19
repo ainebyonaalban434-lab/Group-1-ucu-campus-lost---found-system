@@ -1,3 +1,4 @@
+
 import express from 'express';
 import pool from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -34,7 +35,7 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(statusCode).json({ message });
     };
 
-    // Lock this report so concurrent claims and admin actions are coordinated.
+    // Lock the report to coordinate concurrent claims and admin actions.
     const [reportRows] = await connection.execute(
       'SELECT id, reporter_id, item_type, status FROM item_reports WHERE id = ? FOR UPDATE',
       [itemReportId]
@@ -109,6 +110,16 @@ router.post('/', requireAuth, async (req, res, next) => {
       transactionActive = false;
     }
 
+    // Handle duplicate claims enforced by the database unique index.
+    if (
+      error.code === 'ER_DUP_ENTRY' &&
+      error.message?.includes('uq_claims_item_claimant')
+    ) {
+      return res.status(409).json({
+        message: 'You have already submitted a claim for this item.',
+      });
+    }
+
     return next(error);
   } finally {
     if (connection) {
@@ -120,8 +131,20 @@ router.post('/', requireAuth, async (req, res, next) => {
 router.get('/my', requireAuth, async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT c.*, r.title AS item_title, r.item_type, r.status AS report_status, u.full_name AS claimant_name,
-              fr.full_name AS reporter_name
+      `SELECT
+         c.id,
+         c.item_report_id,
+         c.claimant_id,
+         c.status,
+         c.admin_response,
+         c.reviewed_by,
+         c.created_at,
+         c.updated_at,
+         r.title AS item_title,
+         r.item_type,
+         r.status AS report_status,
+         u.full_name AS claimant_name,
+         fr.full_name AS reporter_name
        FROM claims c
        JOIN item_reports r ON r.id = c.item_report_id
        JOIN users u ON u.id = c.claimant_id
@@ -155,10 +178,29 @@ router.get('/:id/evidence', requireAuth, async (req, res, next) => {
     }
 
     const claim = rows[0];
-    const isOwner = Number(claim.claimant_id) === Number(req.session.userId);
-    const isAdmin = req.session.user?.role === 'ADMIN';
+    const isOwner =
+      Number(claim.claimant_id) === Number(req.session.userId);
 
-    if (!isOwner && !isAdmin) {
+    // Claimants can access their own evidence.
+    if (isOwner) {
+      return res.json({ evidence: claim.evidence });
+    }
+
+    // Verify the current role in the database.
+    const [userRows] = await pool.execute(
+      'SELECT role FROM users WHERE id = ? LIMIT 1',
+      [req.session.userId]
+    );
+
+    if (!userRows.length) {
+      req.session.destroy(() => {});
+
+      return res.status(401).json({
+        message: 'Your session is no longer valid. Please log in again.',
+      });
+    }
+
+    if (userRows[0].role !== 'ADMIN') {
       return res.status(403).json({
         message: 'You may only access your own claim evidence or administrator review data.',
       });

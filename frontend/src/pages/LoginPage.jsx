@@ -24,9 +24,9 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login(form);
-      navigate('/dashboard');
-    } catch (submitError) {
+  const data = await login(form);
+  navigate(data.user.role === 'ADMIN' ? '/admin' : '/dashboard');
+} catch (submitError) {
       setError(submitError.response?.data?.message || 'Unable to log in. Please try again.');
     } finally {
       setIsSubmitting(false);
