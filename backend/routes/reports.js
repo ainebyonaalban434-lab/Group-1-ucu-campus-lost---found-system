@@ -97,8 +97,8 @@ router.get('/', async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
       `SELECT r.id, r.reporter_id, r.item_type, r.title, r.category,
-              r.public_description, r.item_date, r.campus_location,
-              r.image_url, r.status, r.created_at,
+              r.public_description, DATE_FORMAT(r.item_date, '%Y-%m-%d') AS item_date,
+              r.campus_location, r.image_url, r.status, r.created_at,
               u.full_name AS reporter_name
        FROM item_reports r
        JOIN users u ON u.id = r.reporter_id

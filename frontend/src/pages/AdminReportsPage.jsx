@@ -1,63 +1,72 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api';
 
-export default function AdminReportsPage() {
-  const [reports, setReports] = useState([]);
+export default function AdminClaimsPage() {
+  const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const loadReports = async () => {
+    const loadClaims = async () => {
       try {
-        const { data } = await api.get('/admin/reports');
-        setReports(data.reports || []);
-      } catch (error) {
-        console.error(error);
+        setError('');
+        const { data } = await api.get('/admin/claims');
+        setClaims(data.claims || []);
+      } catch (loadError) {
+        setError(
+          loadError.response?.data?.message ||
+            'Unable to load ownership claims.'
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    loadReports();
+    loadClaims();
   }, []);
-
-  const markReturned = async (reportId) => {
-    try {
-      const { data } = await api.patch(`/admin/reports/${reportId}/return`);
-      alert(data.message);
-      setReports((current) => current.map((report) => report.id === reportId ? { ...report, status: 'RETURNED' } : report));
-    } catch (error) {
-      alert(error.response?.data?.message || 'Unable to mark this item as returned.');
-    }
-  };
 
   return (
     <div className="page-shell">
       <header className="page-header">
         <div>
           <span className="eyebrow">Admin review</span>
-          <h1>Report management</h1>
+          <h1>Ownership claims</h1>
         </div>
       </header>
 
+      {error && <div className="error-banner" role="alert">{error}</div>}
+
       {loading ? (
-        <p>Loading reports...</p>
+        <p role="status">Loading claims...</p>
+      ) : claims.length === 0 ? (
+        <div className="empty-state">No ownership claims have been submitted yet.</div>
       ) : (
         <div className="list-stack">
-          {reports.map((report) => (
-            <article key={report.id} className="claim-card">
+          {claims.map((claim) => (
+            <article key={claim.id} className="claim-card">
               <div className="report-card-top">
-                <span className={`status-badge ${report.item_type.toLowerCase()}`}>{report.item_type}</span>
-                <span>{report.status}</span>
+                <span className={`status-badge ${claim.status.toLowerCase()}`}>
+                  {claim.status}
+                </span>
+                <span>{claim.item_title} ({claim.report_status})</span>
               </div>
-              <h3>{report.title}</h3>
-              <p>{report.public_description}</p>
-              <p><strong>Reporter:</strong> {report.reporter_name}</p>
-              <p><strong>Location:</strong> {report.campus_location}</p>
-              {report.private_details && <p><strong>Private details:</strong> {report.private_details}</p>}
-              {report.status !== 'RETURNED' && (
-                <button type="button" className="primary-button inline-button" onClick={() => markReturned(report.id)}>
-                  Confirm return
-                </button>
+
+              <p><strong>Claimant:</strong> {claim.claimant_name}</p>
+              <p><strong>Evidence:</strong> {claim.evidence}</p>
+              <p><strong>Reporter:</strong> {claim.reporter_name}</p>
+              {claim.admin_response && (
+                <p><strong>Admin response:</strong> {claim.admin_response}</p>
+              )}
+
+              {claim.status === 'PENDING' ? (
+                <Link className="primary-button inline-button" to={`/admin/claims/${claim.id}`}>
+                  Review claim
+                </Link>
+              ) : (
+                <Link className="secondary-button inline-button" to={`/admin/claims/${claim.id}`}>
+                  View decision
+                </Link>
               )}
             </article>
           ))}
